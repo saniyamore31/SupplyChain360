@@ -85,31 +85,31 @@ Small to mid-sized hardware and electronics manufacturing operations frequently 
 ### Data Flow Diagram
 
 ```mermaid
-graph TD
-    User([Operations User / Browser]) <-->|HTTP / JSON| Frontend[React 18 Frontend - Vite Port 5173]
-    Frontend <-->|REST API Requests /api/v1| FlaskApp[Flask Backend Port 5000]
+flowchart TD
+    User(["Operations User / Browser"]) <-->|HTTP / JSON| Frontend["React 18 Frontend - Vite Port 5173"]
+    Frontend <-->|REST API Requests| FlaskApp["Flask Backend Port 5000"]
     
-    subgraph Flask Application Architecture
-        FlaskApp --> Router[Blueprint Router]
-        Router --> V1Health[/api/v1/health]
-        Router --> V1Products[/api/v1/products]
-        Router --> V1Suppliers[/api/v1/suppliers]
-        Router --> V1Orders[/api/v1/purchase-orders]
-        Router --> V1Dashboard[/api/v1/dashboard]
-        Router --> V1Demand[/api/v1/demand]
-        Router --> V1Recs[/api/v1/recommendations]
-        Router --> V1Settings[/api/v1/settings]
+    subgraph FlaskAppArchitecture ["Flask Application Architecture"]
+        FlaskApp --> Router["Blueprint Router"]
+        Router --> V1Health["/api/v1/health"]
+        Router --> V1Products["/api/v1/products"]
+        Router --> V1Suppliers["/api/v1/suppliers"]
+        Router --> V1Orders["/api/v1/purchase-orders"]
+        Router --> V1Dashboard["/api/v1/dashboard"]
+        Router --> V1Demand["/api/v1/demand"]
+        Router --> V1Recs["/api/v1/recommendations"]
+        Router --> V1Settings["/api/v1/settings"]
         
-        V1Orders --> ReceiptEngine[Safe Inventory Receipt Service]
-        V1Recs --> RecEngine[Deterministic Inventory Optimization]
+        V1Orders --> ReceiptEngine["Safe Inventory Receipt Service"]
+        V1Recs --> RecEngine["Deterministic Inventory Optimization"]
     end
     
-    ReceiptEngine <-->|ACID Transactions| ORM[SQLAlchemy ORM]
+    ReceiptEngine <-->|ACID Transactions| ORM["SQLAlchemy ORM"]
     V1Products <-->|CRUD Queries| ORM
     V1Suppliers <-->|Relationship Queries| ORM
     V1Demand <-->|Aggregation Queries| ORM
     
-    ORM <-->|Persistent File Storage| SQLite[(SQLite Database: supplychain360.db)]
+    ORM <-->|Persistent File Storage| SQLite[("SQLite Database: supplychain360.db")]
 ```
 
 ### How a User Action Travels Through the Stack

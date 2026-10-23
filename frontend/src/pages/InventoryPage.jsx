@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Search, Filter, Edit, Trash2, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plus, Search, Filter, Edit, Trash2, AlertCircle, CheckCircle, ShieldAlert } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -12,6 +13,7 @@ import { formatCurrency, formatNumber } from '../utils/formatters';
 
 export default function InventoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { canManageInventory } = useAuth();
 
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
@@ -108,6 +110,7 @@ export default function InventoryPage() {
   };
 
   const openCreateModal = () => {
+    if (!canManageInventory) return;
     setEditingProduct(null);
     setFormData({
       name: '',
@@ -124,6 +127,7 @@ export default function InventoryPage() {
   };
 
   const openEditModal = (prod) => {
+    if (!canManageInventory) return;
     setEditingProduct(prod);
     setFormData({
       name: prod.name,
@@ -377,7 +381,13 @@ export default function InventoryPage() {
           </select>
 
           {/* Add Product Button */}
-          <button onClick={openCreateModal} className="btn btn-primary">
+          <button
+            onClick={openCreateModal}
+            className="btn btn-primary"
+            disabled={!canManageInventory}
+            title={canManageInventory ? 'Register new product in catalog' : 'Requires Inventory Manager or Admin role'}
+            style={!canManageInventory ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+          >
             <Plus size={16} /> Add Product
           </button>
         </div>
@@ -400,35 +410,45 @@ export default function InventoryPage() {
           sortDirection={sortOrder}
           onSort={handleSort}
           actions={(row) => (
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-              <button
-                onClick={() => openEditModal(row)}
-                aria-label={`Edit ${row.name}`}
-                style={{
-                  background: 'none',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  padding: '0.35rem 0.5rem',
-                  cursor: 'pointer',
-                  color: '#475569',
-                }}
-              >
-                <Edit size={15} />
-              </button>
-              <button
-                onClick={() => confirmDelete(row)}
-                aria-label={`Delete ${row.name}`}
-                style={{
-                  background: 'none',
-                  border: '1px solid #fee2e2',
-                  borderRadius: '6px',
-                  padding: '0.35rem 0.5rem',
-                  cursor: 'pointer',
-                  color: '#dc2626',
-                }}
-              >
-                <Trash2 size={15} />
-              </button>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
+              {canManageInventory ? (
+                <>
+                  <button
+                    onClick={() => openEditModal(row)}
+                    aria-label={`Edit ${row.name}`}
+                    title="Edit Product"
+                    style={{
+                      background: 'none',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      padding: '0.35rem 0.5rem',
+                      cursor: 'pointer',
+                      color: '#475569',
+                    }}
+                  >
+                    <Edit size={15} />
+                  </button>
+                  <button
+                    onClick={() => confirmDelete(row)}
+                    aria-label={`Delete ${row.name}`}
+                    title="Delete Product"
+                    style={{
+                      background: 'none',
+                      border: '1px solid #fee2e2',
+                      borderRadius: '6px',
+                      padding: '0.35rem 0.5rem',
+                      cursor: 'pointer',
+                      color: '#dc2626',
+                    }}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </>
+              ) : (
+                <span style={{ fontSize: '0.75rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                  Read-only
+                </span>
+              )}
             </div>
           )}
         />

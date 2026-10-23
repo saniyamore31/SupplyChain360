@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app import db
 
 class Supplier(db.Model):
@@ -14,7 +14,7 @@ class Supplier(db.Model):
     phone = db.Column(db.String(50), nullable=False)
     address = db.Column(db.Text, nullable=True)
     lead_time_days = db.Column(db.Integer, default=7, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships
     products = db.relationship("Product", back_populates="supplier", lazy="select")

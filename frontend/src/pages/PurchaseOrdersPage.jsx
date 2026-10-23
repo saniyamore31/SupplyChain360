@@ -14,6 +14,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -24,6 +25,7 @@ import { formatCurrency, formatDate, formatNumber } from '../utils/formatters';
 
 export default function PurchaseOrdersPage() {
   const location = useLocation();
+  const { canManageOrders } = useAuth();
 
   const [orders, setOrders] = useState([]);
   const [total, setTotal] = useState(0);
@@ -366,6 +368,7 @@ export default function PurchaseOrdersPage() {
 
           <button
             onClick={() => {
+              if (!canManageOrders) return;
               setOrderForm({
                 supplier_id: suppliers[0]?.id || '',
                 order_date: new Date().toISOString().split('T')[0],
@@ -378,6 +381,9 @@ export default function PurchaseOrdersPage() {
               setIsCreateOpen(true);
             }}
             className="btn btn-primary"
+            disabled={!canManageOrders}
+            title={canManageOrders ? 'Draft new purchase order' : 'Requires Operations Manager or Admin role'}
+            style={!canManageOrders ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
           >
             <Plus size={16} /> Create Purchase Order
           </button>
@@ -536,80 +542,88 @@ export default function PurchaseOrdersPage() {
                 Pipeline Transitions (Enforces transactional business logic)
               </span>
 
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
-                {selectedOrder.status === 'draft' && (
-                  <>
-                    <button
-                      onClick={() => handleStatusTransition('pending')}
-                      disabled={processingStatus}
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.8rem' }}
-                    >
-                      <Clock size={14} /> Submit as Pending
-                    </button>
-                    <button
-                      onClick={() => handleStatusTransition('cancelled')}
-                      disabled={processingStatus}
-                      className="btn btn-danger"
-                      style={{ fontSize: '0.8rem' }}
-                    >
-                      Cancel Order
-                    </button>
-                  </>
-                )}
-
-                {selectedOrder.status === 'pending' && (
-                  <>
-                    <button
-                      onClick={() => handleStatusTransition('shipped')}
-                      disabled={processingStatus}
-                      className="btn btn-secondary"
-                      style={{ fontSize: '0.8rem' }}
-                    >
-                      <Truck size={14} /> Mark as In Transit (Shipped)
-                    </button>
-                    <button
-                      onClick={() => handleStatusTransition('cancelled')}
-                      disabled={processingStatus}
-                      className="btn btn-danger"
-                      style={{ fontSize: '0.8rem' }}
-                    >
-                      Cancel Order
-                    </button>
-                  </>
-                )}
-
-                {selectedOrder.status === 'shipped' && (
-                  <>
-                    <button
-                      onClick={() => handleStatusTransition('delivered')}
-                      disabled={processingStatus}
-                      className="btn btn-primary"
-                      style={{ background: '#10b981', borderColor: '#059669', fontSize: '0.8rem' }}
-                    >
-                      <PackageCheck size={16} /> Confirm Receipt & Add to Inventory
-                    </button>
-                    <button
-                      onClick={() => handleStatusTransition('cancelled')}
-                      disabled={processingStatus}
-                      className="btn btn-danger"
-                      style={{ fontSize: '0.8rem' }}
-                    >
-                      Cancel Order
-                    </button>
-                  </>
-                )}
-
-                {selectedOrder.status === 'delivered' && (
-                  <span style={{ fontSize: '0.82rem', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <CheckCircle size={15} /> Order Delivered & Fully Received
+              <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                {!canManageOrders ? (
+                  <span style={{ fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+                    Status transitions & order receipt require Operations Manager or Admin role.
                   </span>
-                )}
+                ) : (
+                  <>
+                    {selectedOrder.status === 'draft' && (
+                      <>
+                        <button
+                          onClick={() => handleStatusTransition('pending')}
+                          disabled={processingStatus}
+                          className="btn btn-secondary"
+                          style={{ fontSize: '0.8rem' }}
+                        >
+                          <Clock size={14} /> Submit as Pending
+                        </button>
+                        <button
+                          onClick={() => handleStatusTransition('cancelled')}
+                          disabled={processingStatus}
+                          className="btn btn-danger"
+                          style={{ fontSize: '0.8rem' }}
+                        >
+                          Cancel Order
+                        </button>
+                      </>
+                    )}
 
-                {selectedOrder.status === 'cancelled' && (
-                  <span style={{ fontSize: '0.82rem', color: '#dc2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                    <XCircle size={15} /> Order Cancelled
-                  </span>
+                    {selectedOrder.status === 'pending' && (
+                      <>
+                        <button
+                          onClick={() => handleStatusTransition('shipped')}
+                          disabled={processingStatus}
+                          className="btn btn-secondary"
+                          style={{ fontSize: '0.8rem' }}
+                        >
+                          <Truck size={14} /> Mark as In Transit (Shipped)
+                        </button>
+                        <button
+                          onClick={() => handleStatusTransition('cancelled')}
+                          disabled={processingStatus}
+                          className="btn btn-danger"
+                          style={{ fontSize: '0.8rem' }}
+                        >
+                          Cancel Order
+                        </button>
+                      </>
+                    )}
+
+                    {selectedOrder.status === 'shipped' && (
+                      <>
+                        <button
+                          onClick={() => handleStatusTransition('delivered')}
+                          disabled={processingStatus}
+                          className="btn btn-primary"
+                          style={{ background: '#10b981', borderColor: '#059669', fontSize: '0.8rem' }}
+                        >
+                          <PackageCheck size={16} /> Confirm Receipt & Add to Inventory
+                        </button>
+                        <button
+                          onClick={() => handleStatusTransition('cancelled')}
+                          disabled={processingStatus}
+                          className="btn btn-danger"
+                          style={{ fontSize: '0.8rem' }}
+                        >
+                          Cancel Order
+                        </button>
+                      </>
+                    )}
+
+                    {selectedOrder.status === 'delivered' && (
+                      <span style={{ fontSize: '0.82rem', color: '#059669', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <CheckCircle size={15} /> Order Delivered & Fully Received
+                      </span>
+                    )}
+
+                    {selectedOrder.status === 'cancelled' && (
+                      <span style={{ fontSize: '0.82rem', color: '#dc2626', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <XCircle size={15} /> Order Cancelled
+                      </span>
+                    )}
+                  </>
                 )}
               </div>
             </div>

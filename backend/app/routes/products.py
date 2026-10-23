@@ -3,7 +3,8 @@ from sqlalchemy import or_, desc, asc
 from app import db
 from app.models.product import Product
 from app.models.supplier import Supplier
-from app.models.purchase_order import PurchaseOrderItem
+from app.services.inventory_service import InventoryService
+from app.services.auth_service import roles_required
 
 products_bp = Blueprint("products", __name__)
 
@@ -52,7 +53,6 @@ def get_products():
     elif sort_by == "created_at":
         sort_col = Product.created_at
     elif sort_by == "inventory_value":
-        # In SQL: stock_quantity * unit_cost
         sort_col = (Product.stock_quantity * Product.unit_cost)
 
     if sort_order == "desc":
@@ -63,7 +63,6 @@ def get_products():
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     products = [p.to_dict() for p in pagination.items]
 
-    # Distinct categories for filter dropdowns
     categories = [c[0] for c in db.session.query(Product.category).distinct().all()]
 
     return jsonify({
@@ -80,18 +79,18 @@ def get_products():
 @products_bp.route("/products/<int:id>", methods=["GET"])
 def get_product(id):
     """Retrieve single product details."""
-    product = Product.query.get(id)
+    product = db.session.get(Product, id)
     if not product:
         return jsonify({"success": False, "error": "Not Found", "message": f"Product with ID {id} does not exist."}), 404
     return jsonify({"success": True, "product": product.to_dict()}), 200
 
 
 @products_bp.route("/products", methods=["POST"])
+@roles_required("admin", "inventory_manager")
 def create_product():
-    """Create a new product with input validation."""
+    """Create a new product with input validation and role authorization."""
     data = request.get_json() or {}
 
-    # Required field validation
     errors = {}
     name = (data.get("name") or "").strip()
     sku = (data.get("sku") or "").strip().upper()
@@ -134,7 +133,7 @@ def create_product():
         errors["unit_cost"] = "Unit cost must be a non-negative number."
 
     if supplier_id:
-        supplier = Supplier.query.get(supplier_id)
+        supplier = db.session.get(Supplier, supplier_id)
         if not supplier:
             errors["supplier_id"] = f"Supplier with ID {supplier_id} not found."
 
@@ -162,9 +161,10 @@ def create_product():
 
 
 @products_bp.route("/products/<int:id>", methods=["PUT"])
+@roles_required("admin", "inventory_manager")
 def update_product(id):
     """Update existing product details with validation."""
-    product = Product.query.get(id)
+    product = db.session.get(Product, id)
     if not product:
         return jsonify({"success": False, "error": "Not Found", "message": f"Product with ID {id} does not exist."}), 404
 
@@ -229,7 +229,7 @@ def update_product(id):
     if "supplier_id" in data:
         sup_id = data["supplier_id"]
         if sup_id:
-            supplier = Supplier.query.get(sup_id)
+            supplier = db.session.get(Supplier, sup_id)
             if not supplier:
                 errors["supplier_id"] = f"Supplier with ID {sup_id} not found."
             else:
@@ -252,24 +252,19 @@ def update_product(id):
 
 
 @products_bp.route("/products/<int:id>", methods=["DELETE"])
+@roles_required("admin", "inventory_manager")
 def delete_product(id):
-    """
-    Safely delete product or reject if referenced by purchase orders.
-    Enforces referential integrity rule from requirements:
-    'Do not silently delete products referenced by purchase order history or demand records.
-    Implement a safe restriction or archival approach and explain it to the user.'
-    """
-    product = Product.query.get(id)
+    """Safely delete product or reject if referenced by purchase orders."""
+    product = db.session.get(Product, id)
     if not product:
         return jsonify({"success": False, "error": "Not Found", "message": f"Product with ID {id} does not exist."}), 404
 
-    # Check if product is referenced in any purchase order items
-    po_item_count = PurchaseOrderItem.query.filter_by(product_id=id).count()
-    if po_item_count > 0:
+    is_safe, error_msg, _ = InventoryService.check_product_deletion_safety(id)
+    if not is_safe:
         return jsonify({
             "success": False,
             "error": "Deletion Restricted",
-            "message": f"Cannot delete '{product.name}' because it is referenced in {po_item_count} purchase order record(s). Removing it would corrupt historical accounting records."
+            "message": error_msg
         }), 409
 
     product_name = product.name

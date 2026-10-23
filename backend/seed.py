@@ -13,7 +13,7 @@ import random
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from app import create_app, db
-from app.models import Supplier, Product, PurchaseOrder, PurchaseOrderItem, DemandRecord, AppSetting
+from app.models import Supplier, Product, PurchaseOrder, PurchaseOrderItem, DemandRecord, AppSetting, User
 
 def clear_data():
     """Destructively wipe existing tables for a clean reset."""
@@ -24,20 +24,71 @@ def clear_data():
     Product.query.delete()
     Supplier.query.delete()
     AppSetting.query.delete()
+    User.query.delete()
     db.session.commit()
     print("Database cleared successfully.")
+
+def seed_users():
+    """Seed standard reproducible demonstration users for all RBAC roles."""
+    demo_users_data = [
+        {
+            "username": "admin",
+            "email": "admin@supplychain360.local",
+            "role": "admin",
+            "full_name": "System Administrator",
+            "password": "Password123"
+        },
+        {
+            "username": "ops_manager",
+            "email": "ops@supplychain360.local",
+            "role": "operations_manager",
+            "full_name": "Operations Lead",
+            "password": "Password123"
+        },
+        {
+            "username": "inv_manager",
+            "email": "inventory@supplychain360.local",
+            "role": "inventory_manager",
+            "full_name": "Inventory Supervisor",
+            "password": "Password123"
+        },
+        {
+            "username": "viewer",
+            "email": "auditor@supplychain360.local",
+            "role": "viewer",
+            "full_name": "Auditor & Guest Viewer",
+            "password": "Password123"
+        }
+    ]
+
+    for u_info in demo_users_data:
+        existing = User.query.filter_by(username=u_info["username"]).first()
+        if not existing:
+            user = User(
+                username=u_info["username"],
+                email=u_info["email"],
+                role=u_info["role"],
+                full_name=u_info["full_name"]
+            )
+            user.set_password(u_info["password"])
+            db.session.add(user)
+    db.session.commit()
 
 def seed_data(reset=False):
     """Seed the database with realistic demonstration data."""
     if reset:
         clear_data()
     elif Product.query.first():
-        print("Database already contains data. Use --reset to overwrite.")
+        print("Database already contains data. Ensuring demo users exist...")
+        seed_users()
         return
 
     print("Seeding SupplyChain360 database with demonstration records...")
 
-    # 1. Default Settings
+    # 1. Demo User Accounts (RBAC)
+    seed_users()
+
+    # 2. Default Settings
     AppSetting.set_value("business_name", "SupplyChain360 Logistics & Tech", "Business legal entity name")
     AppSetting.set_value("currency_code", "INR", "Default currency ISO code")
     AppSetting.set_value("currency_symbol", "₹", "Default currency symbol")

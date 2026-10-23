@@ -61,6 +61,7 @@ def create_app(config_name=None):
 
     # Register blueprints under /api/v1
     from app.routes.health import health_bp
+    from app.routes.auth import auth_bp
     from app.routes.products import products_bp
     from app.routes.suppliers import suppliers_bp
     from app.routes.purchase_orders import purchase_orders_bp
@@ -70,6 +71,7 @@ def create_app(config_name=None):
     from app.routes.settings import settings_bp
 
     app.register_blueprint(health_bp, url_prefix="/api/v1")
+    app.register_blueprint(auth_bp, url_prefix="/api/v1")
     app.register_blueprint(products_bp, url_prefix="/api/v1")
     app.register_blueprint(suppliers_bp, url_prefix="/api/v1")
     app.register_blueprint(purchase_orders_bp, url_prefix="/api/v1")

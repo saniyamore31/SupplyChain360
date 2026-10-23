@@ -3,8 +3,8 @@ from flask import Blueprint, request, jsonify
 from sqlalchemy import or_
 from app import db
 from app.models.supplier import Supplier
-from app.models.product import Product
-from app.models.purchase_order import PurchaseOrder
+from app.services.inventory_service import InventoryService
+from app.services.auth_service import roles_required
 
 suppliers_bp = Blueprint("suppliers", __name__)
 
@@ -12,9 +12,7 @@ EMAIL_REGEX = r"^[\w\.-]+@[\w\.-]+\.\w+$"
 
 @suppliers_bp.route("/suppliers", methods=["GET"])
 def get_suppliers():
-    """
-    List suppliers with optional search and pagination.
-    """
+    """List suppliers with optional search and pagination."""
     search = request.args.get("search", "", type=str).strip()
     page = request.args.get("page", 1, type=int)
     per_page = request.args.get("per_page", 20, type=int)
@@ -43,7 +41,7 @@ def get_suppliers():
 @suppliers_bp.route("/suppliers/<int:id>", methods=["GET"])
 def get_supplier(id):
     """Retrieve detailed information for a single supplier, including associated products."""
-    supplier = Supplier.query.get(id)
+    supplier = db.session.get(Supplier, id)
     if not supplier:
         return jsonify({"success": False, "error": "Not Found", "message": f"Supplier with ID {id} does not exist."}), 404
 
@@ -54,6 +52,7 @@ def get_supplier(id):
 
 
 @suppliers_bp.route("/suppliers", methods=["POST"])
+@roles_required("admin", "inventory_manager")
 def create_supplier():
     """Create a new supplier with comprehensive validation."""
     data = request.get_json() or {}
@@ -111,9 +110,10 @@ def create_supplier():
 
 
 @suppliers_bp.route("/suppliers/<int:id>", methods=["PUT"])
+@roles_required("admin", "inventory_manager")
 def update_supplier(id):
     """Update supplier details."""
-    supplier = Supplier.query.get(id)
+    supplier = db.session.get(Supplier, id)
     if not supplier:
         return jsonify({"success": False, "error": "Not Found", "message": f"Supplier with ID {id} does not exist."}), 404
 
@@ -179,28 +179,19 @@ def update_supplier(id):
 
 
 @suppliers_bp.route("/suppliers/<int:id>", methods=["DELETE"])
+@roles_required("admin", "inventory_manager")
 def delete_supplier(id):
-    """
-    Safely delete supplier or reject if products or purchase orders are attached.
-    """
-    supplier = Supplier.query.get(id)
+    """Safely delete supplier or reject if products or purchase orders are attached."""
+    supplier = db.session.get(Supplier, id)
     if not supplier:
         return jsonify({"success": False, "error": "Not Found", "message": f"Supplier with ID {id} does not exist."}), 404
 
-    prod_count = Product.query.filter_by(supplier_id=id).count()
-    if prod_count > 0:
+    is_safe, error_msg = InventoryService.check_supplier_deletion_safety(id)
+    if not is_safe:
         return jsonify({
             "success": False,
             "error": "Deletion Restricted",
-            "message": f"Cannot delete supplier '{supplier.company_name}' because {prod_count} product(s) are assigned to this supplier. Reassign or delete those products first."
-        }), 409
-
-    po_count = PurchaseOrder.query.filter_by(supplier_id=id).count()
-    if po_count > 0:
-        return jsonify({
-            "success": False,
-            "error": "Deletion Restricted",
-            "message": f"Cannot delete supplier '{supplier.company_name}' because {po_count} historical purchase order(s) exist for this supplier."
+            "message": error_msg
         }), 409
 
     name = supplier.company_name

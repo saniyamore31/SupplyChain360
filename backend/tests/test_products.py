@@ -2,8 +2,8 @@ from app import db
 from app.models import Product, PurchaseOrder, PurchaseOrderItem
 from datetime import date
 
-def test_create_product(client, sample_data):
-    """Test successful product creation."""
+def test_create_product(client, sample_data, inv_headers):
+    """Test successful product creation by inventory manager."""
     payload = {
         "name": "Capacitor 100uF",
         "sku": "ELEC-CAP-999",
@@ -14,14 +14,14 @@ def test_create_product(client, sample_data):
         "supplier_id": sample_data["supplier"].id,
         "description": "Ceramic capacitor"
     }
-    res = client.post("/api/v1/products", json=payload)
+    res = client.post("/api/v1/products", json=payload, headers=inv_headers)
     assert res.status_code == 201
     data = res.get_json()
     assert data["success"] is True
     assert data["product"]["sku"] == "ELEC-CAP-999"
     assert data["product"]["inventory_value"] == 250 * 5.75
 
-def test_duplicate_sku_rejection(client, sample_data):
+def test_duplicate_sku_rejection(client, sample_data, inv_headers):
     """Test that creating a product with an existing SKU is rejected."""
     payload = {
         "name": "Duplicate Item",
@@ -31,13 +31,13 @@ def test_duplicate_sku_rejection(client, sample_data):
         "reorder_level": 5,
         "unit_cost": 50.0
     }
-    res = client.post("/api/v1/products", json=payload)
+    res = client.post("/api/v1/products", json=payload, headers=inv_headers)
     assert res.status_code == 400
     data = res.get_json()
     assert data["success"] is False
     assert "sku" in data["errors"]
 
-def test_product_validation_errors(client):
+def test_product_validation_errors(client, inv_headers):
     """Test rejection of invalid negative values and missing required fields."""
     payload = {
         "name": "",
@@ -45,7 +45,7 @@ def test_product_validation_errors(client):
         "stock_quantity": -5,
         "unit_cost": -10.0
     }
-    res = client.post("/api/v1/products", json=payload)
+    res = client.post("/api/v1/products", json=payload, headers=inv_headers)
     assert res.status_code == 400
     data = res.get_json()
     assert "name" in data["errors"]
@@ -53,23 +53,22 @@ def test_product_validation_errors(client):
     assert "stock_quantity" in data["errors"]
     assert "unit_cost" in data["errors"]
 
-def test_update_product(client, sample_data):
+def test_update_product(client, sample_data, inv_headers):
     """Test updating product details."""
     p_id = sample_data["product_low"].id
     res = client.put(f"/api/v1/products/{p_id}", json={
         "stock_quantity": 45,
         "reorder_level": 30
-    })
+    }, headers=inv_headers)
     assert res.status_code == 200
     data = res.get_json()
     assert data["product"]["stock_quantity"] == 45
     assert data["product"]["reorder_level"] == 30
     assert data["product"]["is_low_stock"] is False
 
-def test_safe_product_deletion_restriction(client, sample_data):
+def test_safe_product_deletion_restriction(client, sample_data, admin_headers):
     """Test that deleting a product referenced in purchase orders is safely restricted."""
     p = sample_data["product_healthy"]
-    # Create a PO referencing this product
     po = PurchaseOrder(
         order_number="PO-TEST-0001",
         supplier_id=sample_data["supplier"].id,
@@ -92,7 +91,7 @@ def test_safe_product_deletion_restriction(client, sample_data):
     db.session.commit()
 
     # Attempt to delete the product
-    res = client.delete(f"/api/v1/products/{p.id}")
+    res = client.delete(f"/api/v1/products/{p.id}", headers=admin_headers)
     assert res.status_code == 409
     data = res.get_json()
     assert "referenced in" in data["message"]

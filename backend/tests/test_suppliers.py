@@ -1,4 +1,4 @@
-def test_create_supplier(client):
+def test_create_supplier(client, inv_headers):
     """Test valid supplier creation."""
     payload = {
         "company_name": "New Alpha Labs",
@@ -7,13 +7,13 @@ def test_create_supplier(client):
         "phone": "+91 98111 22222",
         "lead_time_days": 12
     }
-    res = client.post("/api/v1/suppliers", json=payload)
+    res = client.post("/api/v1/suppliers", json=payload, headers=inv_headers)
     assert res.status_code == 201
     data = res.get_json()
     assert data["supplier"]["company_name"] == "New Alpha Labs"
     assert data["supplier"]["lead_time_days"] == 12
 
-def test_supplier_validation(client):
+def test_supplier_validation(client, inv_headers):
     """Test supplier email and required field validation."""
     payload = {
         "company_name": "",
@@ -22,7 +22,7 @@ def test_supplier_validation(client):
         "phone": "",
         "lead_time_days": 0
     }
-    res = client.post("/api/v1/suppliers", json=payload)
+    res = client.post("/api/v1/suppliers", json=payload, headers=inv_headers)
     assert res.status_code == 400
     errors = res.get_json()["errors"]
     assert "company_name" in errors
@@ -30,10 +30,10 @@ def test_supplier_validation(client):
     assert "phone" in errors
     assert "lead_time_days" in errors
 
-def test_supplier_deletion_restriction(client, sample_data):
+def test_supplier_deletion_restriction(client, sample_data, admin_headers):
     """Test that a supplier with associated products cannot be deleted."""
     sup_id = sample_data["supplier"].id
-    res = client.delete(f"/api/v1/suppliers/{sup_id}")
+    res = client.delete(f"/api/v1/suppliers/{sup_id}", headers=admin_headers)
     assert res.status_code == 409
     data = res.get_json()
     assert "assigned to this supplier" in data["message"]

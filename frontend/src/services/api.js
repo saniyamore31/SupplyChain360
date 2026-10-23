@@ -2,16 +2,21 @@
 const API_BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 /**
- * Handles standard HTTP request with error catching and JSON parsing.
+ * Handles standard HTTP request with error catching, Bearer token injection, and JSON parsing.
  */
 async function request(endpoint, options = {}) {
   const url = `${API_BASE_URL}${endpoint}`;
+  
+  const token = localStorage.getItem('supplychain360_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    ...options.headers,
+  };
+
   const config = {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
     ...options,
+    headers,
   };
 
   try {
@@ -38,6 +43,12 @@ async function request(endpoint, options = {}) {
 export const api = {
   // Health
   getHealth: () => request('/health'),
+
+  // Authentication & RBAC
+  login: (username, password) => request('/auth/login', { method: 'POST', body: JSON.stringify({ username, password }) }),
+  logout: () => request('/auth/logout', { method: 'POST' }),
+  getMe: () => request('/auth/me'),
+  getDemoUsers: () => request('/auth/demo-users'),
 
   // Products
   getProducts: (params = '') => request(`/products${params ? `?${params}` : ''}`),
@@ -80,5 +91,5 @@ export const api = {
   getSettings: () => request('/settings'),
   updateSettings: (payload) => request('/settings', { method: 'PUT', body: JSON.stringify(payload) }),
   seedDemoData: () => request('/settings/seed', { method: 'POST' }),
-  resetDemoData: () => request('/settings/reset', { method: 'POST' }),
+  resetDemoData: () => request('/settings/reset', { method: 'POST', body: JSON.stringify({ confirm: 'CONFIRM_DEMO_RESET' }) }),
 };

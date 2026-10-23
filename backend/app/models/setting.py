@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app import db
 
 class AppSetting(db.Model):
@@ -10,7 +10,7 @@ class AppSetting(db.Model):
     key = db.Column(db.String(50), primary_key=True)
     value = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text, nullable=True)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     @classmethod
     def get_value(cls, key, default=None):
@@ -27,7 +27,7 @@ class AppSetting(db.Model):
             setting.value = str(value)
             if description:
                 setting.description = description
-            setting.updated_at = datetime.utcnow()
+            setting.updated_at = datetime.now(timezone.utc)
         db.session.commit()
         return setting
 

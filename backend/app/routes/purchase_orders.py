@@ -1,10 +1,12 @@
-from datetime import datetime, date
+from datetime import datetime, date, timezone, timedelta
 from flask import Blueprint, request, jsonify
 from sqlalchemy import or_, desc
 from app import db
 from app.models.purchase_order import PurchaseOrder, PurchaseOrderItem
 from app.models.product import Product
 from app.models.supplier import Supplier
+from app.services.inventory_service import InventoryService
+from app.services.auth_service import roles_required
 
 purchase_orders_bp = Blueprint("purchase_orders", __name__)
 
@@ -20,15 +22,13 @@ VALID_TRANSITIONS = {
 
 def generate_order_number():
     """Generate sequential human-readable order number like PO-YYYY-NNNN."""
-    year = datetime.utcnow().year
+    year = datetime.now(timezone.utc).year
     count = PurchaseOrder.query.filter(PurchaseOrder.order_number.like(f"PO-{year}-%")).count() + 1
     return f"PO-{year}-{count:04d}"
 
 @purchase_orders_bp.route("/purchase-orders", methods=["GET"])
 def get_orders():
-    """
-    List purchase orders with search, supplier filter, status filter, and pagination.
-    """
+    """List purchase orders with search, supplier filter, status filter, and pagination."""
     search = request.args.get("search", "", type=str).strip()
     status = request.args.get("status", "", type=str).strip().lower()
     supplier_id = request.args.get("supplier_id", type=int)
@@ -61,7 +61,7 @@ def get_orders():
 @purchase_orders_bp.route("/purchase-orders/<int:id>", methods=["GET"])
 def get_order(id):
     """Retrieve complete purchase order details with all line items."""
-    order = PurchaseOrder.query.get(id)
+    order = db.session.get(PurchaseOrder, id)
     if not order:
         return jsonify({"success": False, "error": "Not Found", "message": f"Purchase order {id} not found."}), 404
 
@@ -72,6 +72,7 @@ def get_order(id):
 
 
 @purchase_orders_bp.route("/purchase-orders", methods=["POST"])
+@roles_required("admin", "operations_manager")
 def create_order():
     """
     Create a new purchase order with one or more line items.
@@ -94,7 +95,7 @@ def create_order():
     if not supplier_id:
         errors["supplier_id"] = "Supplier selection is required."
     else:
-        supplier = Supplier.query.get(supplier_id)
+        supplier = db.session.get(Supplier, supplier_id)
         if not supplier:
             errors["supplier_id"] = f"Supplier with ID {supplier_id} does not exist."
 
@@ -112,7 +113,6 @@ def create_order():
                 errors["expected_delivery_date"] = "Expected delivery date cannot be earlier than order date."
         else:
             lead_time = supplier.lead_time_days if supplier else 7
-            from datetime import timedelta
             expected_delivery_date = order_date + timedelta(days=lead_time)
     except ValueError:
         errors["expected_delivery_date"] = "Expected delivery date must be in YYYY-MM-DD format."
@@ -123,7 +123,7 @@ def create_order():
     if errors:
         return jsonify({"success": False, "error": "Validation Error", "errors": errors, "message": "Form validation failed."}), 400
 
-    # Validate each line item
+    # Validate line items
     line_items_to_create = []
     total_amount = 0.0
 
@@ -132,7 +132,7 @@ def create_order():
         qty = item_input.get("quantity")
         unit_price = item_input.get("unit_price")
 
-        product = Product.query.get(prod_id) if prod_id else None
+        product = db.session.get(Product, prod_id) if prod_id else None
         if not product:
             errors[f"item_{idx}_product"] = f"Product at line {idx+1} does not exist."
             continue
@@ -166,10 +166,8 @@ def create_order():
     if errors:
         return jsonify({"success": False, "error": "Validation Error", "errors": errors, "message": "Line item validation failed."}), 400
 
-    # Save order and line items inside a transaction
     try:
         order_number = generate_order_number()
-        # Verify uniqueness
         while PurchaseOrder.query.filter_by(order_number=order_number).first():
             order_number = generate_order_number()
 
@@ -209,12 +207,10 @@ def create_order():
 
 
 @purchase_orders_bp.route("/purchase-orders/<int:id>/status", methods=["PATCH"])
+@roles_required("admin", "operations_manager")
 def update_order_status(id):
-    """
-    Update purchase order status adhering strictly to allowed state transitions.
-    If transitioned to 'delivered', delegates safely to the inventory receipt routine.
-    """
-    order = PurchaseOrder.query.get(id)
+    """Update order status adhering to state machine transitions."""
+    order = db.session.get(PurchaseOrder, id)
     if not order:
         return jsonify({"success": False, "error": "Not Found", "message": f"Purchase order {id} not found."}), 404
 
@@ -236,7 +232,6 @@ def update_order_status(id):
             "order": order.to_dict()
         }), 200
 
-    # Validate state transition
     allowed = VALID_TRANSITIONS.get(order.status, set())
     if new_status not in allowed:
         return jsonify({
@@ -245,7 +240,6 @@ def update_order_status(id):
             "message": f"Cannot transition order from '{order.status}' to '{new_status}'. Allowed next transitions: {', '.join(sorted(allowed)) if allowed else 'None (Terminal state)'}."
         }), 400
 
-    # If transitioning to delivered, execute receipt
     if new_status == "delivered":
         return receive_order(id)
 
@@ -262,69 +256,23 @@ def update_order_status(id):
 
 
 @purchase_orders_bp.route("/purchase-orders/<int:id>/receive", methods=["POST"])
+@roles_required("admin", "operations_manager")
 def receive_order(id):
     """
     Critical Inventory Receipt Operation:
-    - Atomically receives an order into inventory.
-    - Guarantees each purchase order can update inventory EXACTLY ONCE.
-    - Prevents cancelled orders from being received.
-    - Uses database transaction to update stock and set is_received = True.
+    Atomically updates stock exactly once via InventoryService.
     """
-    order = PurchaseOrder.query.get(id)
-    if not order:
-        return jsonify({"success": False, "error": "Not Found", "message": f"Purchase order {id} not found."}), 404
-
-    # 1. Check if already received
-    if order.is_received:
+    success, error_type, message, status_code, data = InventoryService.receive_purchase_order_transactional(id)
+    if not success:
         return jsonify({
             "success": False,
-            "error": "Already Received",
-            "message": f"Purchase order {order.order_number} was already received into inventory on {order.received_at}. Duplicate receipt is prohibited to prevent double-counting stock."
-        }), 409
+            "error": error_type,
+            "message": message
+        }), status_code
 
-    # 2. Check if cancelled
-    if order.status == "cancelled":
-        return jsonify({
-            "success": False,
-            "error": "Order Cancelled",
-            "message": f"Cannot receive order {order.order_number} because it has been cancelled."
-        }), 400
-
-    # 3. Transactional inventory receipt
-    try:
-        updated_products = []
-        for item in order.items:
-            product = Product.query.get(item.product_id)
-            if not product:
-                raise ValueError(f"Product ID {item.product_id} from line item no longer exists.")
-
-            old_stock = product.stock_quantity
-            product.stock_quantity += item.quantity
-            updated_products.append({
-                "product_name": product.name,
-                "sku": product.sku,
-                "previous_stock": old_stock,
-                "quantity_added": item.quantity,
-                "new_stock": product.stock_quantity
-            })
-
-        order.status = "delivered"
-        order.is_received = True
-        order.received_at = datetime.utcnow()
-
-        db.session.commit()
-
-        return jsonify({
-            "success": True,
-            "message": f"Purchase order {order.order_number} received successfully. Inventory has been updated.",
-            "order": order.to_dict(include_items=True),
-            "updated_products": updated_products
-        }), 200
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({
-            "success": False,
-            "error": "Receipt Transaction Failed",
-            "message": f"Failed to receive order into inventory: {str(e)}"
-        }), 500
+    return jsonify({
+        "success": True,
+        "message": message,
+        "order": data["order"],
+        "updated_products": data["updated_products"]
+    }), 200

@@ -11,11 +11,13 @@ import {
   Server
 } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import FormField from '../components/FormField';
 import ConfirmDialog from '../components/ConfirmDialog';
 import { LoadingState, ErrorMessage } from '../components/FeedbackStates';
 
 export default function SettingsPage() {
+  const { isAdmin, user } = useAuth();
   const [settings, setSettings] = useState({
     business_name: '',
     currency_code: 'INR',
@@ -110,6 +112,24 @@ export default function SettingsPage() {
         </div>
       )}
 
+      {/* Role Notice Banner for non-admins */}
+      {!isAdmin && (
+        <div style={{
+          padding: '0.85rem 1rem',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.65rem',
+          backgroundColor: '#eff6ff',
+          border: '1px solid #bfdbfe',
+          color: '#1e40af',
+          fontSize: '0.875rem',
+        }}>
+          <ShieldAlert size={18} />
+          <span>Signed in as <strong>{user?.role_name || 'Restricted Role'}</strong>. Modifying enterprise configuration and executing database resets requires <strong>Admin</strong> privileges.</span>
+        </div>
+      )}
+
       {/* Business Configuration Card */}
       <div style={{
         background: '#ffffff',
@@ -133,6 +153,7 @@ export default function SettingsPage() {
             id="business_name"
             label="Enterprise Legal Entity Name"
             required
+            disabled={!isAdmin}
             value={settings.business_name}
             onChange={(e) => setSettings({ ...settings, business_name: e.target.value })}
             placeholder="e.g. SupplyChain360 Global Logistics Ltd"
@@ -143,6 +164,7 @@ export default function SettingsPage() {
               id="currency_code"
               label="Default Currency Code (ISO)"
               required
+              disabled={!isAdmin}
               value={settings.currency_code}
               onChange={(e) => setSettings({ ...settings, currency_code: e.target.value.toUpperCase() })}
               placeholder="INR, USD, EUR..."
@@ -152,6 +174,7 @@ export default function SettingsPage() {
               id="currency_symbol"
               label="Currency Display Symbol"
               required
+              disabled={!isAdmin}
               value={settings.currency_symbol}
               onChange={(e) => setSettings({ ...settings, currency_symbol: e.target.value })}
               placeholder="₹, $, €..."
@@ -165,13 +188,20 @@ export default function SettingsPage() {
             type="number"
             step="0.1"
             min="0.5"
+            disabled={!isAdmin}
             value={settings.low_stock_threshold_multiplier}
             onChange={(e) => setSettings({ ...settings, low_stock_threshold_multiplier: e.target.value })}
             helpText="Scale factor applied to standard target-stock calculations (Default: 1.0)"
           />
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1rem' }}>
-            <button type="submit" className="btn btn-primary" disabled={saving}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={saving || !isAdmin}
+              title={isAdmin ? 'Save Settings' : 'Requires Admin role'}
+              style={!isAdmin ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+            >
               <Save size={16} /> {saving ? 'Saving...' : 'Save Settings'}
             </button>
           </div>
@@ -257,6 +287,9 @@ export default function SettingsPage() {
           <button
             onClick={() => setResetDialogOpen(true)}
             className="btn btn-danger"
+            disabled={!isAdmin}
+            title={isAdmin ? 'Reset database to initial state' : 'Requires Admin role'}
+            style={!isAdmin ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
           >
             <RotateCcw size={16} /> Reset to Clean Demo State
           </button>

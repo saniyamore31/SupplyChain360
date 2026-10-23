@@ -27,6 +27,7 @@ import {
 } from 'recharts';
 
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/DataTable';
 import ChartCard from '../components/ChartCard';
 import SummaryCard from '../components/SummaryCard';
@@ -36,6 +37,7 @@ import { formatDate, formatNumber, formatCurrency } from '../utils/formatters';
 
 export default function DemandAnalyticsPage() {
   const navigate = useNavigate();
+  const { canManageOrders } = useAuth();
 
   const [activeTab, setActiveTab] = useState('demand'); // 'demand' or 'recommendations'
   const [demandRecords, setDemandRecords] = useState([]);
@@ -537,8 +539,14 @@ export default function DemandAnalyticsPage() {
                             unit_price: rec.unit_cost,
                           }
                         })}
+                        disabled={!canManageOrders}
+                        title={canManageOrders ? 'Draft purchase order from recommendation' : 'Requires Operations Manager or Admin role'}
                         className="btn btn-primary"
-                        style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem' }}
+                        style={{
+                          fontSize: '0.8rem',
+                          padding: '0.4rem 0.85rem',
+                          ...(!canManageOrders ? { opacity: 0.5, cursor: 'not-allowed' } : {})
+                        }}
                       >
                         Create Purchase Order <ArrowRight size={14} />
                       </button>

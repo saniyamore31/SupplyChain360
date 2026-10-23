@@ -6,6 +6,8 @@ from app.models.product import Product
 from app.models.supplier import Supplier
 from app.models.purchase_order import PurchaseOrder
 from app.models.demand import DemandRecord
+from app.models.user import User
+from app.services.auth_service import roles_required
 from seed import seed_data
 
 settings_bp = Blueprint("settings", __name__)
@@ -15,13 +17,11 @@ def get_settings():
     """Retrieve application settings and database environment diagnostics."""
     settings = {s.key: s.value for s in AppSetting.query.all()}
     
-    # Defaults
     settings.setdefault("business_name", "SupplyChain360 Global Logistics")
     settings.setdefault("currency_code", "INR")
     settings.setdefault("currency_symbol", "₹")
     settings.setdefault("low_stock_threshold_multiplier", "1.0")
 
-    # Live database metrics
     db_diagnostics = {
         "database_type": "SQLite 3",
         "sqlite_version": sqlite3.sqlite_version,
@@ -29,7 +29,8 @@ def get_settings():
             "products": Product.query.count(),
             "suppliers": Supplier.query.count(),
             "purchase_orders": PurchaseOrder.query.count(),
-            "demand_records": DemandRecord.query.count()
+            "demand_records": DemandRecord.query.count(),
+            "users": User.query.count()
         }
     }
 
@@ -41,8 +42,9 @@ def get_settings():
 
 
 @settings_bp.route("/settings", methods=["PUT"])
+@roles_required("admin")
 def update_settings():
-    """Update configurable business preferences."""
+    """Update configurable business preferences (Admin only)."""
     data = request.get_json() or {}
 
     if "business_name" in data:
@@ -75,8 +77,9 @@ def update_settings():
 
 
 @settings_bp.route("/settings/seed", methods=["POST"])
+@roles_required("admin")
 def seed_database():
-    """Safely seed demo data if the database is currently empty."""
+    """Safely seed demo data if the database is currently empty (Admin only)."""
     if Product.query.first():
         return jsonify({
             "success": False,
@@ -91,11 +94,11 @@ def seed_database():
 
 
 @settings_bp.route("/settings/reset", methods=["POST"])
+@roles_required("admin")
 def reset_database():
     """
-    Destructive demonstration data reset.
-    Enforces requirement 12 & 16:
-    'Require explicit user confirmation before deleting or replacing demonstration records.'
+    Destructive demonstration data reset (Admin only).
+    Enforces explicit confirmation.
     """
     data = request.get_json() or {}
     confirmation = data.get("confirm")

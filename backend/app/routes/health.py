@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify
-from datetime import datetime
+from datetime import datetime, timezone
 
 health_bp = Blueprint("health", __name__)
 
@@ -11,5 +11,5 @@ def health_check():
         "status": "healthy",
         "service": "SupplyChain360 API",
         "version": "1.0.0",
-        "timestamp": datetime.utcnow().isoformat() + "Z"
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }), 200

@@ -1,6 +1,7 @@
 import pytest
 from app import create_app, db
-from app.models import Supplier, Product, PurchaseOrder, PurchaseOrderItem, DemandRecord, AppSetting
+from app.models import Supplier, Product, PurchaseOrder, PurchaseOrderItem, DemandRecord, AppSetting, User
+from app.services.auth_service import generate_token
 
 @pytest.fixture
 def app():
@@ -16,6 +17,44 @@ def app():
 def client(app):
     """Test client for HTTP requests."""
     return app.test_client()
+
+@pytest.fixture
+def auth_users(app):
+    """Seed users for all 4 RBAC roles."""
+    users = {}
+    roles = [
+        ("admin", "admin@test.local", "admin"),
+        ("ops_manager", "ops@test.local", "operations_manager"),
+        ("inv_manager", "inv@test.local", "inventory_manager"),
+        ("viewer", "viewer@test.local", "viewer"),
+    ]
+    for username, email, role in roles:
+        u = User(username=username, email=email, role=role, full_name=f"Test {role}")
+        u.set_password("Password123")
+        db.session.add(u)
+        users[role] = u
+    db.session.commit()
+    return users
+
+@pytest.fixture
+def admin_headers(app, auth_users):
+    token = generate_token(auth_users["admin"])
+    return {"Authorization": f"Bearer {token}"}
+
+@pytest.fixture
+def ops_headers(app, auth_users):
+    token = generate_token(auth_users["operations_manager"])
+    return {"Authorization": f"Bearer {token}"}
+
+@pytest.fixture
+def inv_headers(app, auth_users):
+    token = generate_token(auth_users["inventory_manager"])
+    return {"Authorization": f"Bearer {token}"}
+
+@pytest.fixture
+def viewer_headers(app, auth_users):
+    token = generate_token(auth_users["viewer"])
+    return {"Authorization": f"Bearer {token}"}
 
 @pytest.fixture
 def sample_data(app):

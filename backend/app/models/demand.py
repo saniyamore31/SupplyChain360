@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from app import db
 
 class DemandRecord(db.Model):
@@ -14,7 +14,7 @@ class DemandRecord(db.Model):
     quantity_demanded = db.Column(db.Integer, nullable=False)
     channel = db.Column(db.String(50), default="Direct Sales", nullable=False)
     is_synthetic = db.Column(db.Boolean, default=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
 
     # Relationships
     product = db.relationship("Product", back_populates="demand_records")

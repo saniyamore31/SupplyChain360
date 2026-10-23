@@ -1,10 +1,22 @@
 import React, { useState } from 'react';
-import { Bell, Search, Menu, User, AlertCircle, ArrowRight } from 'lucide-react';
+import { Bell, Search, Menu, User, AlertCircle, ArrowRight, LogIn, LogOut, Shield, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Topbar({ title, breadcrumb = 'Overview', lowStockAlerts = [], onToggleSidebar }) {
   const [showNotifications, setShowNotifications] = useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const navigate = useNavigate();
+  const { user, role, logout, setIsLoginModalOpen } = useAuth();
+
+  const roleBadgeColors = {
+    admin: { bg: '#fef2f2', text: '#dc2626', border: '#fecaca', label: 'Admin' },
+    operations_manager: { bg: '#eff6ff', text: '#2563eb', border: '#bfdbfe', label: 'Operations' },
+    inventory_manager: { bg: '#ecfdf5', text: '#059669', border: '#a7f3d0', label: 'Inventory' },
+    viewer: { bg: '#f8fafc', text: '#64748b', border: '#cbd5e1', label: 'Viewer' }
+  };
+
+  const badge = roleBadgeColors[role] || roleBadgeColors.viewer;
 
   return (
     <header style={{
@@ -47,7 +59,7 @@ export default function Topbar({ title, breadcrumb = 'Overview', lowStockAlerts 
         </div>
       </div>
 
-      {/* Action utilities & Demo User Profile */}
+      {/* Action utilities & User Profile */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '1.25rem' }}>
         {/* Low Stock Alert Bell with Dropdown */}
         <div style={{ position: 'relative' }}>
@@ -154,38 +166,133 @@ export default function Topbar({ title, breadcrumb = 'Overview', lowStockAlerts 
           )}
         </div>
 
-        {/* Demo User Profile Placeholder */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.65rem',
-          padding: '0.35rem 0.65rem',
-          borderRadius: '8px',
-          background: '#f8fafc',
-          border: '1px solid #e2e8f0',
-        }}>
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: '#e0e7ff',
-            color: '#3730a3',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 700,
-            fontSize: '0.85rem',
-          }}>
-            <User size={18} />
-          </div>
-          <div>
-            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
-              Engineering Student
+        {/* Authenticated User Profile & Role Switcher */}
+        <div style={{ position: 'relative' }}>
+          <div
+            onClick={() => setShowUserMenu(!showUserMenu)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.65rem',
+              padding: '0.35rem 0.65rem',
+              borderRadius: '8px',
+              background: '#f8fafc',
+              border: '1px solid #e2e8f0',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+          >
+            <div style={{
+              width: '32px',
+              height: '32px',
+              borderRadius: '50%',
+              background: badge.bg,
+              color: badge.text,
+              border: `1px solid ${badge.border}`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+            }}>
+              <User size={17} />
             </div>
-            <div style={{ fontSize: '0.7rem', color: '#64748b' }}>
-              Operations Lead (Demo)
+            <div>
+              <div style={{ fontSize: '0.82rem', fontWeight: 700, color: '#0f172a', lineHeight: 1.2 }}>
+                {user?.full_name || user?.username || 'Guest'}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', marginTop: '0.1rem' }}>
+                <span style={{
+                  fontSize: '0.68rem',
+                  fontWeight: 700,
+                  color: badge.text,
+                  background: badge.bg,
+                  border: `1px solid ${badge.border}`,
+                  padding: '0.05rem 0.35rem',
+                  borderRadius: '4px',
+                  textTransform: 'uppercase',
+                }}>
+                  {badge.label}
+                </span>
+              </div>
             </div>
+            <ChevronDown size={14} color="#64748b" />
           </div>
+
+          {/* User dropdown menu */}
+          {showUserMenu && (
+            <div style={{
+              position: 'absolute',
+              right: 0,
+              top: '48px',
+              width: '230px',
+              background: '#ffffff',
+              borderRadius: '10px',
+              border: '1px solid #e2e8f0',
+              boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)',
+              padding: '0.5rem',
+              zIndex: 50,
+            }}>
+              <div style={{ padding: '0.4rem 0.6rem 0.6rem', borderBottom: '1px solid #f1f5f9' }}>
+                <span style={{ fontSize: '0.75rem', color: '#64748b', display: 'block' }}>Signed in as</span>
+                <strong style={{ fontSize: '0.85rem', color: '#0f172a' }}>{user?.username || 'viewer'}</strong>
+              </div>
+
+              <div style={{ padding: '0.4rem 0' }}>
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    setIsLoginModalOpen(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.45rem 0.6rem',
+                    background: 'none',
+                    border: 'none',
+                    borderRadius: '6px',
+                    textAlign: 'left',
+                    fontSize: '0.82rem',
+                    color: '#2563eb',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#eff6ff')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <Shield size={15} /> Switch Demo Role
+                </button>
+
+                <button
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    logout();
+                    setIsLoginModalOpen(true);
+                  }}
+                  style={{
+                    width: '100%',
+                    padding: '0.45rem 0.6rem',
+                    background: 'none',
+                    border: 'none',
+                    borderRadius: '6px',
+                    textAlign: 'left',
+                    fontSize: '0.82rem',
+                    color: '#dc2626',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.4rem',
+                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.backgroundColor = '#fef2f2')}
+                  onMouseLeave={(e) => (e.currentTarget.style.backgroundColor = 'transparent')}
+                >
+                  <LogOut size={15} /> Sign Out
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </header>

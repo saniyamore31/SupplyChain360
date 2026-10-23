@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, Edit, Trash2, Eye, Building2, Phone, Mail, Clock, CheckCircle, AlertCircle, Package } from 'lucide-react';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import DataTable from '../components/DataTable';
 import Modal from '../components/Modal';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -8,6 +9,7 @@ import FormField from '../components/FormField';
 import { LoadingState, ErrorMessage } from '../components/FeedbackStates';
 
 export default function SuppliersPage() {
+  const { canManageInventory } = useAuth();
   const [suppliers, setSuppliers] = useState([]);
   const [total, setTotal] = useState(0);
   const [totalPages, setTotalPages] = useState(1);
@@ -75,6 +77,7 @@ export default function SuppliersPage() {
   };
 
   const openCreateModal = () => {
+    if (!canManageInventory) return;
     setEditingSupplier(null);
     setFormData({
       company_name: '',
@@ -89,6 +92,7 @@ export default function SuppliersPage() {
   };
 
   const openEditModal = (sup) => {
+    if (!canManageInventory) return;
     setEditingSupplier(sup);
     setFormData({
       company_name: sup.company_name,
@@ -291,7 +295,13 @@ export default function SuppliersPage() {
           </button>
         </form>
 
-        <button onClick={openCreateModal} className="btn btn-primary">
+        <button
+          onClick={openCreateModal}
+          className="btn btn-primary"
+          disabled={!canManageInventory}
+          title={canManageInventory ? 'Register new vendor supplier' : 'Requires Inventory Manager or Admin role'}
+          style={!canManageInventory ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
+        >
           <Plus size={16} /> Register Supplier
         </button>
       </div>
@@ -310,7 +320,7 @@ export default function SuppliersPage() {
           totalPages={totalPages}
           onPageChange={setPage}
           actions={(row) => (
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', alignItems: 'center' }}>
               <button
                 onClick={() => openDetailModal(row)}
                 title="View Supplier Details & Products"
@@ -325,34 +335,38 @@ export default function SuppliersPage() {
               >
                 <Eye size={15} />
               </button>
-              <button
-                onClick={() => openEditModal(row)}
-                title="Edit Supplier"
-                style={{
-                  background: 'none',
-                  border: '1px solid #e2e8f0',
-                  borderRadius: '6px',
-                  padding: '0.35rem 0.5rem',
-                  cursor: 'pointer',
-                  color: '#475569',
-                }}
-              >
-                <Edit size={15} />
-              </button>
-              <button
-                onClick={() => confirmDelete(row)}
-                title="Delete Supplier"
-                style={{
-                  background: 'none',
-                  border: '1px solid #fee2e2',
-                  borderRadius: '6px',
-                  padding: '0.35rem 0.5rem',
-                  cursor: 'pointer',
-                  color: '#dc2626',
-                }}
-              >
-                <Trash2 size={15} />
-              </button>
+              {canManageInventory ? (
+                <>
+                  <button
+                    onClick={() => openEditModal(row)}
+                    title="Edit Supplier"
+                    style={{
+                      background: 'none',
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '6px',
+                      padding: '0.35rem 0.5rem',
+                      cursor: 'pointer',
+                      color: '#475569',
+                    }}
+                  >
+                    <Edit size={15} />
+                  </button>
+                  <button
+                    onClick={() => confirmDelete(row)}
+                    title="Delete Supplier"
+                    style={{
+                      background: 'none',
+                      border: '1px solid #fee2e2',
+                      borderRadius: '6px',
+                      padding: '0.35rem 0.5rem',
+                      cursor: 'pointer',
+                      color: '#dc2626',
+                    }}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </>
+              ) : null}
             </div>
           )}
         />

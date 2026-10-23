@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import LoginModal from './LoginModal';
+import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 
 const routeTitles = {
@@ -17,8 +19,8 @@ export default function AppLayout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [lowStockAlerts, setLowStockAlerts] = useState([]);
+  const { isLoginModalOpen, setIsLoginModalOpen } = useAuth();
 
-  // Fetch low stock items for the topbar notification bell and sidebar badge
   const fetchAlerts = async () => {
     try {
       const res = await api.getLowStockAlerts();
@@ -67,6 +69,11 @@ export default function AppLayout() {
           <Outlet context={{ refreshAlerts: fetchAlerts }} />
         </main>
       </div>
+
+      <LoginModal
+        isOpen={isLoginModalOpen}
+        onClose={() => setIsLoginModalOpen(false)}
+      />
 
       <style>{`
         @media (max-width: 900px) {

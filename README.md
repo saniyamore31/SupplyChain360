@@ -74,7 +74,7 @@ Small to mid-sized hardware and electronics manufacturing operations frequently 
 ### 🎯 Explainable Rule-Based Reorder Recommendations
 - **Classical Deterministic Formulation**:
   1. $\text{Lead-Time Demand} = \text{Average Daily Demand} \times \text{Vendor Lead Time (Days)}$
-  2. $\text{Target Safety Buffer} = \text{Lead-Time Demand} + \text{Reorder Level} \times \text{Safety Multiplier}$
+  2. $\text{Target Safety Buffer} = \text{Lead-Time Demand} + (\text{Reorder Level} \times \text{Safety Multiplier})$
   3. $\text{Suggested Reorder Quantity} = \max(0, \text{Target Safety Buffer} - \text{Current Stock})$
 - **Zero Black-Box AI**: Transparent reasoning displayed on every recommendation card with urgency badges (`CRITICAL`, `HIGH`, `MEDIUM`, `HEALTHY`) and one-click purchase order prefilling.
 
@@ -276,40 +276,42 @@ SupplyChain360 includes 4 pre-configured demo accounts for portfolio walkthrough
 
 All endpoints are versioned under `/api/v1` and return standard JSON payloads.
 
-| Method | Endpoint | Authorized Roles | Description |
+| Method | Endpoint | Access Control | Description |
 | :--- | :--- | :--- | :--- |
 | `POST` | `/api/v1/auth/login` | Public | Authenticate with credentials and receive Bearer token |
-| `POST` | `/api/v1/auth/logout` | Authenticated | Logout active session |
-| `GET` | `/api/v1/auth/me` | Authenticated | Return current authenticated user profile |
+| `POST` | `/api/v1/auth/logout` | Public | Client-side session termination (returns 200 OK; token is cleared by client) |
+| `GET` | `/api/v1/auth/me` | Authenticated (Any Role) | Return current authenticated user profile |
 | `GET` | `/api/v1/auth/demo-users`| Public | List pre-configured demo accounts for UI switcher |
 | `GET` | `/api/v1/health` | Public | System health check and uptime timestamp |
-| `GET` | `/api/v1/dashboard/summary` | Authenticated | Aggregate KPI counts and total inventory valuation |
-| `GET` | `/api/v1/dashboard/inventory-by-category` | Authenticated | Stock counts and valuations grouped by category |
-| `GET` | `/api/v1/dashboard/orders-by-status` | Authenticated | Purchase order distribution grouped by status |
-| `GET` | `/api/v1/dashboard/monthly-demand` | Authenticated | Time-series demand volume for chart rendering |
-| `GET` | `/api/v1/dashboard/low-stock` | Authenticated | Products at or below reorder threshold |
-| `GET` | `/api/v1/products` | Authenticated | Paginated product list with search, category & stock filters |
+| `GET` | `/api/v1/dashboard/summary` | Public | Aggregate KPI counts and total inventory valuation |
+| `GET` | `/api/v1/dashboard/inventory-by-category` | Public | Stock counts and valuations grouped by category |
+| `GET` | `/api/v1/dashboard/orders-by-status` | Public | Purchase order distribution grouped by status |
+| `GET` | `/api/v1/dashboard/monthly-demand` | Public | Time-series demand volume for chart rendering |
+| `GET` | `/api/v1/dashboard/low-stock` | Public | Products at or below reorder threshold |
+| `GET` | `/api/v1/products` | Public | Paginated product list with search, category & stock filters |
+| `GET` | `/api/v1/products/:id` | Public | Retrieve single product details |
 | `POST` | `/api/v1/products` | `admin`, `inventory_manager` | Create product with validation & unique SKU check |
 | `PUT` | `/api/v1/products/:id` | `admin`, `inventory_manager` | Update product details |
 | `DELETE`| `/api/v1/products/:id`| `admin`, `inventory_manager` | Safely delete product (blocked if referenced in orders) |
-| `GET` | `/api/v1/suppliers` | Authenticated | List vendor suppliers with search and pagination |
-| `GET` | `/api/v1/suppliers/:id` | Authenticated | Retrieve supplier profile and assigned products list |
+| `GET` | `/api/v1/suppliers` | Public | List vendor suppliers with search and pagination |
+| `GET` | `/api/v1/suppliers/:id` | Public | Retrieve supplier profile and assigned products list |
 | `POST` | `/api/v1/suppliers` | `admin`, `inventory_manager` | Register new supplier with email validation |
 | `PUT` | `/api/v1/suppliers/:id` | `admin`, `inventory_manager` | Update supplier information |
 | `DELETE`| `/api/v1/suppliers/:id`| `admin`, `inventory_manager` | Safely delete supplier (blocked if catalog products exist) |
-| `GET` | `/api/v1/purchase-orders` | Authenticated | List purchase orders with search and status filter |
-| `GET` | `/api/v1/purchase-orders/:id`| Authenticated | Inspect purchase order with all product line items |
+| `GET` | `/api/v1/purchase-orders` | Public | List purchase orders with search and status filter |
+| `GET` | `/api/v1/purchase-orders/:id`| Public | Inspect purchase order with all product line items |
 | `POST` | `/api/v1/purchase-orders` | `admin`, `operations_manager` | Create purchase order with multi-product line items |
 | `PATCH`| `/api/v1/purchase-orders/:id/status`| `admin`, `operations_manager` | Transition order status adhering to state machine |
 | `POST` | `/api/v1/purchase-orders/:id/receive`| `admin`, `operations_manager` | **Atomic Inventory Receipt**: increments stock exactly once |
-| `GET` | `/api/v1/demand` | Authenticated | Paginated demand records with date range filters |
-| `GET` | `/api/v1/demand/summary` | Authenticated | Demand totals, daily consumption rate, and top items |
-| `GET` | `/api/v1/demand/trends` | Authenticated | Time-series aggregated demand trends |
-| `GET` | `/api/v1/demand/export` | Authenticated | Export filtered demand records as standard CSV |
-| `GET` | `/api/v1/recommendations/reorder` | Authenticated | Rule-based lead-time reorder recommendations |
-| `GET` | `/api/v1/settings` | Authenticated | Retrieve application preferences & SQLite diagnostics |
+| `GET` | `/api/v1/demand` | Public | Paginated demand records with date range filters |
+| `GET` | `/api/v1/demand/summary` | Public | Demand totals, daily consumption rate, and top items |
+| `GET` | `/api/v1/demand/trends` | Public | Time-series aggregated demand trends |
+| `GET` | `/api/v1/demand/export` | Public | Export filtered demand records as standard CSV |
+| `GET` | `/api/v1/recommendations/reorder` | Public | Rule-based lead-time reorder recommendations |
+| `GET` | `/api/v1/settings` | Public | Retrieve application preferences & SQLite diagnostics |
 | `PUT` | `/api/v1/settings` | `admin` | Update enterprise legal name, currency, and safety multiplier |
-| `POST` | `/api/v1/settings/reset` | `admin` | Safe demonstration data reset (requires confirmation) |
+| `POST` | `/api/v1/settings/seed` | `admin` | Seed initial demo records if database is empty |
+| `POST` | `/api/v1/settings/reset` | `admin` | Safe demonstration data reset (requires confirmation payload) |
 
 ---
 
@@ -336,20 +338,24 @@ cd SupplyChain360
    ```powershell
    python -m venv venv
    .\venv\Scripts\Activate.ps1
-   # If script execution is restricted on Windows PowerShell, run:
+   # Tip: If script execution is restricted on Windows PowerShell, run:
    # Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+   # Or invoke the virtual environment Python directly without activating: .\venv\Scripts\python.exe
    ```
 3. Install backend dependencies:
    ```powershell
    pip install -r requirements.txt
+   # Alternative: .\venv\Scripts\python.exe -m pip install -r requirements.txt
    ```
 4. Initialize SQLite database and seed demonstration accounts and records:
    ```powershell
    python seed.py
+   # Alternative: .\venv\Scripts\python.exe seed.py
    ```
 5. Start Flask development server on port 5000:
    ```powershell
    python run.py
+   # Alternative: .\venv\Scripts\python.exe run.py
    ```
    *The Flask API is now live at `http://127.0.0.1:5000`.*
 
